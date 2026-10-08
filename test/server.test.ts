@@ -25,6 +25,12 @@ async function post(body: unknown) {
 const slot = { room: 'A', start: '2026-10-08T09:00:00+09:00', end: '2026-10-08T10:00:00+09:00' };
 
 describe('POST /bookings 제목 검증', () => {
+  it('제목이 없으면 400과 TITLE_REQUIRED', async () => {
+    const res = await post(slot);
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ code: 'TITLE_REQUIRED' });
+  });
+
   it('제목이 공백뿐이면 400과 TITLE_REQUIRED', async () => {
     const res = await post({ ...slot, title: '   ' });
     expect(res.status).toBe(400);
