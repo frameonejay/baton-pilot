@@ -14,6 +14,7 @@ npm start   # http://localhost:3000
 | GET | `/bookings?room=A` | 예약 목록 (시작 시각 순) |
 | POST | `/bookings` | `{ room, title, start, end }`. 겹치면 409 |
 | DELETE | `/bookings/:id` | 예약 취소. 없으면 404 |
+| GET | `/rooms/:id` | 회의실 `{ id, name, capacity }`. 없으면 404 |
 
 ## 규칙
 
