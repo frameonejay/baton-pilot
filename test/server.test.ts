@@ -48,3 +48,24 @@ describe('POST /bookings 제목 검증', () => {
     expect(res.status).toBe(201);
   });
 });
+
+describe('POST /bookings 예약 길이 검증', () => {
+  const day = (time: string) => `2026-10-08T${time}:00+09:00`;
+
+  it('15분보다 짧으면 400과 "15분"이 든 메시지', async () => {
+    const res = await post({ room: 'A', title: 't', start: day('09:00'), end: day('09:14') });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('15분');
+  });
+
+  it('4시간을 넘으면 400과 "4시간"이 든 메시지', async () => {
+    const res = await post({ room: 'A', title: 't', start: day('09:00'), end: day('13:01') });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('4시간');
+  });
+
+  it('정확히 15분, 정확히 4시간이면 201', async () => {
+    expect((await post({ room: 'A', title: 't', start: day('09:00'), end: day('09:15') })).status).toBe(201);
+    expect((await post({ room: 'A', title: 't', start: day('09:00'), end: day('13:00') })).status).toBe(201);
+  });
+});
