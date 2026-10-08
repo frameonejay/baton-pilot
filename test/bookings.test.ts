@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BookingError, BookingStore } from '../src/bookings.ts';
+import { BookingError, type BookingInput, BookingStore } from '../src/bookings.ts';
 
 const at = (hour: number) => `2026-10-08T${String(hour).padStart(2, '0')}:00:00+09:00`;
 
@@ -27,6 +27,23 @@ describe('BookingStore', () => {
     expect(bad({ room: '', title: 't', start: at(9), end: at(10) })).toThrow(BookingError);
     expect(bad({ room: 'A', title: 't', start: 'tomorrow', end: at(10) })).toThrow('형식');
     expect(bad({ room: 'A', title: 't', start: at(10), end: at(9) })).toThrow('뒤여야');
+  });
+
+  it('제목이 없거나 공백뿐이면 400 TITLE_REQUIRED', () => {
+    const store = new BookingStore();
+    const titleRequired = expect.objectContaining({ status: 400, code: 'TITLE_REQUIRED' });
+    expect(() => store.create({ room: 'A', title: '', start: at(9), end: at(10) })).toThrow(titleRequired);
+    expect(() => store.create({ room: 'A', title: '  \t ', start: at(9), end: at(10) })).toThrow(titleRequired);
+    const noTitle = { room: 'A', start: at(9), end: at(10) } as unknown as BookingInput;
+    expect(() => store.create(noTitle)).toThrow(titleRequired);
+  });
+
+  it('제목이 100자를 넘으면 400 TITLE_TOO_LONG, 100자 정확히는 받는다', () => {
+    const store = new BookingStore();
+    expect(() => store.create({ room: 'A', title: '가'.repeat(101), start: at(9), end: at(10) })).toThrow(
+      expect.objectContaining({ status: 400, code: 'TITLE_TOO_LONG' }),
+    );
+    expect(store.create({ room: 'A', title: '가'.repeat(100), start: at(9), end: at(10) }).title).toHaveLength(100);
   });
 
   it('취소한 예약은 사라지고, 없는 예약은 404', () => {
