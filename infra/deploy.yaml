@@ -1,0 +1,4 @@
+# 배포 설정 자리. .ai-team.yml의 deny_paths(infra/**)라 에이전트는 이 폴더를 바꿀 수 없다.
+# Baton 금지 경로 확인용으로 둔다.
+replicas: 1
+port: 3000

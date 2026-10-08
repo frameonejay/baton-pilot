@@ -1,0 +1,22 @@
+{
+  "name": "baton-pilot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Baton 실제 연동 확인용 파일럿 레포: 회의실 예약 API",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --experimental-strip-types src/server.ts",
+    "test": "vitest run",
+    "lint": "biome check . && tsc --noEmit",
+    "format": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@types/node": "22.10.2",
+    "typescript": "5.7.2",
+    "vitest": "2.1.8"
+  }
+}

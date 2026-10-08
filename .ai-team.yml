@@ -1,0 +1,9 @@
+# Baton 에이전트가 이 레포에서 쓰는 명령과 규칙
+setup: npm ci
+test: npm test
+lint: npm run lint
+base_branch: main
+# 필수 금지 경로(.github/workflows/**, .env 등)는 Baton이 항상 더한다
+deny_paths: ["infra/**"]
+conventions: README.md
+max_changed_lines: 400
