@@ -1,8 +1,9 @@
 import { type IncomingMessage, type ServerResponse, createServer } from 'node:http';
 import { BookingError, type BookingInput, BookingStore } from './bookings.ts';
+import { RoomStore } from './rooms.ts';
 
-/** GET /bookings[?room=], POST /bookings, DELETE /bookings/:id */
-export function handler(store: BookingStore) {
+/** GET /bookings[?room=], POST /bookings, DELETE /bookings/:id, GET /rooms/:id */
+export function handler(store: BookingStore, rooms: RoomStore = new RoomStore()) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     try {
@@ -16,6 +17,11 @@ export function handler(store: BookingStore) {
       if (req.method === 'DELETE' && match?.[1]) {
         store.cancel(match[1]);
         return send(res, 204, null);
+      }
+      const room = url.pathname.match(/^\/rooms\/([\w-]+)$/);
+      if (req.method === 'GET' && room?.[1]) {
+        const { id, name, capacity } = rooms.get(room[1]);
+        return send(res, 200, { id, name, capacity });
       }
       return send(res, 404, { error: '없는 경로입니다' });
     } catch (error) {
