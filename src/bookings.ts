@@ -21,6 +21,18 @@ export class BookingError extends Error {
   }
 }
 
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+const KST_OFFSET = 9 * HOUR;
+const OPEN = 9 * HOUR;
+const CLOSE = 18 * HOUR;
+
+/** 한국 시간(+09:00) 기준 같은 날 09:00~18:00 안에 있는지. start, end는 epoch ms */
+function withinBusinessHours(start: number, end: number): boolean {
+  const day = Math.floor((start + KST_OFFSET) / DAY) * DAY - KST_OFFSET;
+  return start >= day + OPEN && end <= day + CLOSE;
+}
+
 export class BookingStore {
   private readonly bookings = new Map<string, Booking>();
   private seq = 0;
@@ -42,6 +54,9 @@ export class BookingStore {
     if (!input.room || !input.title) throw new BookingError(400, '회의실과 제목은 필수입니다');
     if (Number.isNaN(start) || Number.isNaN(end)) throw new BookingError(400, '시작·종료 시각 형식이 맞지 않습니다');
     if (end <= start) throw new BookingError(400, '종료 시각은 시작 시각보다 뒤여야 합니다');
+    if (!withinBusinessHours(start, end)) {
+      throw new BookingError(400, '예약은 업무 시간(한국 시간 09:00~18:00) 안에서만 할 수 있습니다');
+    }
 
     const conflict = this.list(input.room).find((b) => Date.parse(b.start) < end && start < Date.parse(b.end));
     if (conflict) throw new BookingError(409, `${input.room}은 이미 예약돼 있습니다 (${conflict.id})`);
