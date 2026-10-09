@@ -8,7 +8,10 @@ export function handler(store: BookingStore, rooms: RoomStore = new RoomStore())
     const url = new URL(req.url ?? '/', 'http://localhost');
     try {
       if (req.method === 'GET' && url.pathname === '/bookings') {
-        return send(res, 200, store.list(url.searchParams.get('room') ?? undefined));
+        const limit = intParam(url, 'limit', 20, 1, 100);
+        const offset = intParam(url, 'offset', 0, 0);
+        const all = store.list(url.searchParams.get('room') ?? undefined);
+        return send(res, 200, { items: all.slice(offset, offset + limit), total: all.length, limit, offset });
       }
       if (req.method === 'POST' && url.pathname === '/bookings') {
         return send(res, 201, store.create((await readJson(req)) as BookingInput));
@@ -30,6 +33,18 @@ export function handler(store: BookingStore, rooms: RoomStore = new RoomStore())
       return send(res, 500, { error: '서버 오류' });
     }
   };
+}
+
+/** 쿼리 정수 파라미터. 없으면 기본값, 정수가 아니거나 [min, max] 밖이면 400 */
+function intParam(url: URL, name: string, fallback: number, min: number, max = Number.MAX_SAFE_INTEGER): number {
+  const raw = url.searchParams.get(name);
+  if (raw === null) return fallback;
+  const value = Number(raw);
+  if (!/^\d+$/.test(raw) || value < min || value > max) {
+    const range = max === Number.MAX_SAFE_INTEGER ? `${min} 이상` : `${min}~${max}`;
+    throw new BookingError(400, `${name}은 ${range}의 정수여야 합니다`);
+  }
+  return value;
 }
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
