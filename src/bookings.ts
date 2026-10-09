@@ -57,10 +57,11 @@ export class BookingStore {
     if (!input.room) throw new BookingError(400, '회의실은 필수입니다');
     if (Number.isNaN(start) || Number.isNaN(end)) throw new BookingError(400, '시작·종료 시각 형식이 맞지 않습니다');
     if (end <= start) throw new BookingError(400, '종료 시각은 시작 시각보다 뒤여야 합니다');
-    if (end - start < DURATION_MIN_MS) {
+    const duration = end - start;
+    if (duration < DURATION_MIN_MS) {
       throw new BookingError(400, '예약은 15분 이상이어야 합니다', 'DURATION_TOO_SHORT');
     }
-    if (end - start > DURATION_MAX_MS) {
+    if (duration > DURATION_MAX_MS) {
       throw new BookingError(400, '예약은 4시간을 넘을 수 없습니다', 'DURATION_TOO_LONG');
     }
 
