@@ -66,6 +66,11 @@ export class BookingStore {
     if (typeof weeks !== 'number' || !Number.isInteger(weeks) || weeks < REPEAT_WEEKS_MIN || weeks > REPEAT_WEEKS_MAX) {
       throw new BookingError(400, `repeatWeeks는 ${REPEAT_WEEKS_MIN}~${REPEAT_WEEKS_MAX}의 정수여야 합니다`);
     }
+    // 주를 옮기기 전에 첫 주를 검증해 단건 예약과 같은 400을 돌려준다
+    this.check(input);
+    if (typeof input.start !== 'string' || typeof input.end !== 'string') {
+      throw new BookingError(400, '시작·종료 시각 형식이 맞지 않습니다');
+    }
     const inputs = Array.from({ length: weeks }, (_, i) => ({
       ...input,
       start: shiftDays(input.start, 7 * i),
