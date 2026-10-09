@@ -2,7 +2,7 @@ import { type IncomingMessage, type ServerResponse, createServer } from 'node:ht
 import { BookingError, type BookingInput, BookingStore } from './bookings.ts';
 import { RoomStore } from './rooms.ts';
 
-/** GET /bookings[?room=], POST /bookings, DELETE /bookings/:id, GET /rooms/:id */
+/** GET /bookings[?room=], POST /bookings[repeatWeeks], DELETE /bookings/:id, GET /rooms/:id */
 export function handler(store: BookingStore, rooms: RoomStore = new RoomStore()) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -11,7 +11,9 @@ export function handler(store: BookingStore, rooms: RoomStore = new RoomStore())
         return send(res, 200, store.list(url.searchParams.get('room') ?? undefined));
       }
       if (req.method === 'POST' && url.pathname === '/bookings') {
-        return send(res, 201, store.create((await readJson(req)) as BookingInput));
+        const { repeatWeeks, ...input } = (await readJson(req)) as BookingInput & { repeatWeeks?: unknown };
+        if (repeatWeeks === undefined) return send(res, 201, store.create(input));
+        return send(res, 201, store.createWeekly(input, repeatWeeks));
       }
       const match = url.pathname.match(/^\/bookings\/([\w-]+)$/);
       if (req.method === 'DELETE' && match?.[1]) {
