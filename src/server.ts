@@ -2,13 +2,16 @@ import { type IncomingMessage, type ServerResponse, createServer } from 'node:ht
 import { BookingError, type BookingInput, BookingStore } from './bookings.ts';
 import { RoomStore } from './rooms.ts';
 
-/** GET /bookings[?room=], POST /bookings, DELETE /bookings/:id, GET /rooms/:id */
+/** GET /bookings[?room=&limit=&offset=], POST /bookings, DELETE /bookings/:id, GET /rooms/:id */
 export function handler(store: BookingStore, rooms: RoomStore = new RoomStore()) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     try {
       if (req.method === 'GET' && url.pathname === '/bookings') {
-        return send(res, 200, store.list(url.searchParams.get('room') ?? undefined));
+        const limit = intParam(url, 'limit', 20, 1, 100);
+        const offset = intParam(url, 'offset', 0, 0, Number.MAX_SAFE_INTEGER);
+        const all = store.list(url.searchParams.get('room') ?? undefined);
+        return send(res, 200, { items: all.slice(offset, offset + limit), total: all.length, limit, offset });
       }
       if (req.method === 'POST' && url.pathname === '/bookings') {
         return send(res, 201, store.create((await readJson(req)) as BookingInput));
@@ -30,6 +33,18 @@ export function handler(store: BookingStore, rooms: RoomStore = new RoomStore())
       return send(res, 500, { error: '서버 오류' });
     }
   };
+}
+
+/** 쿼리 정수 파라미터. 없으면 기본값, 정수가 아니거나 범위를 벗어나면 400 */
+function intParam(url: URL, name: string, fallback: number, min: number, max: number): number {
+  const raw = url.searchParams.get(name);
+  if (raw === null) return fallback;
+  const value = /^\d+$/.test(raw) ? Number(raw) : Number.NaN;
+  if (!(value >= min && value <= max)) {
+    const range = max === Number.MAX_SAFE_INTEGER ? `${min} 이상` : `${min}~${max}`;
+    throw new BookingError(400, `${name}은 ${range}의 정수여야 합니다`);
+  }
+  return value;
 }
 
 async function readJson(req: IncomingMessage): Promise<unknown> {
