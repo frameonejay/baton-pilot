@@ -57,6 +57,25 @@ describe('POST /bookings 업무 시간 검증', () => {
     expect(res.body.error).toContain('업무 시간');
   });
 
+  it('업무 시간 밖이면서 길이도 어긋나면 400과 "업무 시간"이 든 메시지', async () => {
+    const short = await post({
+      room: 'A',
+      title: 't',
+      start: '2026-10-08T20:00:00+09:00',
+      end: '2026-10-08T20:10:00+09:00',
+    });
+    expect(short.status).toBe(400);
+    expect(short.body.error).toContain('업무 시간');
+    const long = await post({
+      room: 'A',
+      title: 't',
+      start: '2026-10-08T17:00:00+09:00',
+      end: '2026-10-09T10:00:00+09:00',
+    });
+    expect(long.status).toBe(400);
+    expect(long.body.error).toContain('업무 시간');
+  });
+
   it('Z로 적은 시각이 한국 시간 업무 시간 안이면 201', async () => {
     const res = await post({ room: 'A', title: 't', start: '2026-10-08T08:00:00Z', end: '2026-10-08T09:00:00Z' });
     expect(res.status).toBe(201);

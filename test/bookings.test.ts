@@ -67,11 +67,36 @@ describe('BookingStore', () => {
     expect(() => store.create({ room: 'A', title: 't', start: at(17), end: at(18, 1) })).toThrow(outside);
   });
 
-  it('한국 시간으로 같은 날 안에 있지 않으면 400', () => {
+  it('한국 시간으로 같은 날 안에 있지 않으면 400 OUTSIDE_BUSINESS_HOURS', () => {
     const store = new BookingStore();
     expect(() =>
       store.create({ room: 'A', title: 't', start: '2026-10-08T17:00:00+09:00', end: '2026-10-09T09:30:00+09:00' }),
-    ).toThrow(expect.objectContaining({ status: 400 }));
+    ).toThrow(expect.objectContaining({ status: 400, code: 'OUTSIDE_BUSINESS_HOURS' }));
+  });
+
+  it('업무 시간 밖이면서 길이도 어긋나면 길이 오류보다 OUTSIDE_BUSINESS_HOURS가 먼저 나온다', () => {
+    const store = new BookingStore();
+    const outside = expect.objectContaining({
+      status: 400,
+      code: 'OUTSIDE_BUSINESS_HOURS',
+      message: expect.stringContaining('업무 시간'),
+    });
+    // 20:00~20:10: 15분보다 짧다
+    expect(() => store.create({ room: 'A', title: 't', start: at(20), end: at(20, 10) })).toThrow(outside);
+    // 17:00~다음날 10:00: 4시간을 넘는다
+    expect(() => store.create({ room: 'A', title: 't', start: at(17), end: '2026-10-09T10:00:00+09:00' })).toThrow(
+      outside,
+    );
+  });
+
+  it('업무 시간 안에서 길이만 어긋나면 기존 길이 오류가 나온다', () => {
+    const store = new BookingStore();
+    expect(() => store.create({ room: 'A', title: 't', start: at(17, 50), end: at(18) })).toThrow(
+      expect.objectContaining({ status: 400, code: 'DURATION_TOO_SHORT', message: expect.stringContaining('15분') }),
+    );
+    expect(() => store.create({ room: 'A', title: 't', start: at(13), end: at(18) })).toThrow(
+      expect.objectContaining({ status: 400, code: 'DURATION_TOO_LONG', message: expect.stringContaining('4시간') }),
+    );
   });
 
   it('Z 등 다른 오프셋으로 적은 시각도 한국 시간으로 바꿔 판단한다', () => {
