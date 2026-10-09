@@ -39,8 +39,7 @@ describe('BookingStore', () => {
 });
 
 describe('BookingStore 업무 시간', () => {
-  const create = (start: string, end: string) => () =>
-    new BookingStore().create({ room: 'A', title: 't', start, end });
+  const create = (start: string, end: string) => () => new BookingStore().create({ room: 'A', title: 't', start, end });
 
   it('한국 시간 09:00 시작, 18:00 종료는 받는다', () => {
     expect(create(at(9), at(18))().id).toBe('bk-1');
