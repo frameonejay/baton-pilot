@@ -62,19 +62,19 @@ export class BookingStore {
     if (!input.room || !input.title) throw new BookingError(400, '회의실과 제목은 필수입니다');
     if (Number.isNaN(start) || Number.isNaN(end)) throw new BookingError(400, '시작·종료 시각 형식이 맞지 않습니다');
     if (end <= start) throw new BookingError(400, '종료 시각은 시작 시각보다 뒤여야 합니다');
-    const duration = end - start;
-    if (duration < DURATION_MIN_MS) {
-      throw new BookingError(400, '예약은 15분 이상이어야 합니다', 'DURATION_TOO_SHORT');
-    }
-    if (duration > DURATION_MAX_MS) {
-      throw new BookingError(400, '예약은 4시간을 넘을 수 없습니다', 'DURATION_TOO_LONG');
-    }
     if (!withinBusinessHours(start, end)) {
       throw new BookingError(
         400,
         '예약은 업무 시간(한국 시간 09:00~18:00) 안에 있어야 합니다',
         'OUTSIDE_BUSINESS_HOURS',
       );
+    }
+    const duration = end - start;
+    if (duration < DURATION_MIN_MS) {
+      throw new BookingError(400, '예약은 15분 이상이어야 합니다', 'DURATION_TOO_SHORT');
+    }
+    if (duration > DURATION_MAX_MS) {
+      throw new BookingError(400, '예약은 4시간을 넘을 수 없습니다', 'DURATION_TOO_LONG');
     }
 
     const conflict = this.list(input.room).find((b) => Date.parse(b.start) < end && start < Date.parse(b.end));
