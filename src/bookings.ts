@@ -15,6 +15,8 @@ const MINUTE = 60 * 1000;
 /** 예약 길이(종료 - 시작) 하한·상한. 경계값은 받는다. */
 export const DURATION_MIN_MS = 15 * MINUTE;
 export const DURATION_MAX_MS = 4 * 60 * MINUTE;
+/** 시작까지 이만큼 이상 남아야 취소할 수 있다. 경계값은 받는다. */
+export const CANCEL_DEADLINE_MS = 60 * MINUTE;
 
 export class BookingError extends Error {
   constructor(
@@ -67,7 +69,10 @@ export class BookingStore {
   }
 
   cancel(id: string): void {
-    this.get(id);
+    const booking = this.get(id);
+    if (Date.parse(booking.start) - Date.now() < CANCEL_DEADLINE_MS) {
+      throw new BookingError(409, '시작 1시간 전부터는 예약을 취소할 수 없습니다');
+    }
     this.bookings.delete(id);
   }
 }
