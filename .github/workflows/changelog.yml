@@ -1,0 +1,23 @@
+name: changelog
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: CHANGELOG.md 갱신 확인
+        run: |
+          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qx CHANGELOG.md; then
+            echo "CHANGELOG.md가 바뀌었다"
+          else
+            echo "::error file=CHANGELOG.md::PR마다 CHANGELOG.md의 '## 미배포' 아래에 '- [이슈 키] 바뀐 내용' 한 줄을 추가해야 합니다"
+            exit 1
+          fi
