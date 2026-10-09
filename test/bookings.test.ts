@@ -114,4 +114,15 @@ describe('BookingStore.createWeekly', () => {
     expect(() => store.createWeekly({ ...weekly, title: '' }, 3)).toThrow(expect.objectContaining({ status: 400 }));
     expect(store.list()).toEqual([]);
   });
+
+  it('start나 end가 없거나 문자열이 아니면 400이고 아무것도 만들지 않는다', () => {
+    const store = new BookingStore();
+    const { start, end, ...rest } = weekly;
+    for (const input of [{ ...rest, end }, { ...rest, start }, { ...weekly, start: 0 }, { ...weekly, end: 1 }]) {
+      expect(() => store.createWeekly(input as unknown as typeof weekly, 3)).toThrow(
+        expect.objectContaining({ status: 400 }),
+      );
+    }
+    expect(store.list()).toEqual([]);
+  });
 });

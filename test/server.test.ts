@@ -49,11 +49,20 @@ describe('POST /bookings repeatWeeks', () => {
   const weekly = { ...slot, title: '주간 회의' };
 
   it('repeatWeeks가 2~12의 정수가 아니면 400', async () => {
-    for (const repeatWeeks of [1, 13, 2.5, '3', null]) {
+    for (const repeatWeeks of [1, 13, 0, -2, 2.5, '3', null]) {
       const res = await post({ ...weekly, repeatWeeks });
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('repeatWeeks');
     }
+  });
+
+  it('start 없이 repeatWeeks를 주면 400이고 아무것도 만들지 않는다', async () => {
+    const store = new BookingStore();
+    const { start: _start, ...noStart } = weekly;
+    const res = await post({ ...noStart, repeatWeeks: 3 }, store);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('시작·종료 시각 형식이 맞지 않습니다');
+    expect(store.list()).toEqual([]);
   });
 
   it('repeatWeeks가 n이면 201과 첫 주부터 n개 예약의 배열', async () => {
