@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BookingError, BookingStore } from '../src/bookings.ts';
 
 const at = (hour: number, minute = 0) =>
   `2026-10-08T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`;
 
 describe('BookingStore', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('예약을 만들고 시작 시각 순으로 돌려준다', () => {
     const store = new BookingStore();
     store.create({ room: 'A', title: '회고', start: at(15), end: at(16) });
@@ -51,10 +55,39 @@ describe('BookingStore', () => {
   });
 
   it('취소한 예약은 사라지고, 없는 예약은 404', () => {
+    vi.useFakeTimers({ now: new Date(at(8)) });
     const store = new BookingStore();
     const b = store.create({ room: 'A', title: '1', start: at(10), end: at(11) });
     store.cancel(b.id);
     expect(store.list()).toEqual([]);
     expect(() => store.cancel(b.id)).toThrow(expect.objectContaining({ status: 404 }));
+  });
+
+  it('시작까지 1시간 이상 남은 예약은 취소하고, 정확히 1시간 남은 예약도 취소한다', () => {
+    const store = new BookingStore();
+    const early = store.create({ room: 'A', title: '여유', start: at(12), end: at(13) });
+    const edge = store.create({ room: 'B', title: '경계', start: at(11), end: at(12) });
+    vi.useFakeTimers({ now: new Date(at(10)) });
+    store.cancel(early.id);
+    store.cancel(edge.id);
+    expect(store.list()).toEqual([]);
+  });
+
+  it('시작까지 1시간이 안 남았거나 이미 시작한 예약은 409, 메시지에 "1시간", 예약은 남는다', () => {
+    const store = new BookingStore();
+    const soon = store.create({ room: 'A', title: '임박', start: at(11), end: at(12) });
+    const started = store.create({ room: 'B', title: '진행 중', start: at(9), end: at(11) });
+    vi.useFakeTimers({ now: new Date(Date.parse(at(10)) + 1) });
+    for (const id of [soon.id, started.id]) {
+      expect(() => store.cancel(id)).toThrow(
+        expect.objectContaining({ status: 409, message: expect.stringContaining('1시간') }),
+      );
+    }
+    expect(store.list().map((b) => b.id)).toEqual([started.id, soon.id]);
+  });
+
+  it('없는 예약을 취소하면 시각과 상관없이 404', () => {
+    vi.useFakeTimers({ now: new Date(at(23)) });
+    expect(() => new BookingStore().cancel('bk-404')).toThrow(expect.objectContaining({ status: 404 }));
   });
 });
