@@ -16,11 +16,24 @@ const MINUTE = 60 * 1000;
 export const DURATION_MIN_MS = 15 * MINUTE;
 export const DURATION_MAX_MS = 4 * 60 * MINUTE;
 
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+/** 업무 시간은 한국 시간(+09:00) 기준 같은 날 09:00~18:00. 경계값은 받는다. */
+const KST_OFFSET_MS = 9 * HOUR;
+const BUSINESS_OPEN_MS = 9 * HOUR;
+const BUSINESS_CLOSE_MS = 18 * HOUR;
+
+/** 시작 시각이 속한 한국 날짜의 업무 시간 안에 시작·종료가 모두 들어가는지 */
+function withinBusinessHours(start: number, end: number): boolean {
+  const kstMidnight = Math.floor((start + KST_OFFSET_MS) / DAY) * DAY - KST_OFFSET_MS;
+  return start >= kstMidnight + BUSINESS_OPEN_MS && end <= kstMidnight + BUSINESS_CLOSE_MS;
+}
+
 export class BookingError extends Error {
   constructor(
     readonly status: 400 | 404 | 409,
     message: string,
-    /** 클라이언트가 분기할 수 있는 오류 코드 (예약 길이 검증) */
+    /** 클라이언트가 분기할 수 있는 오류 코드 (예약 길이·업무 시간 검증) */
     readonly code?: string,
   ) {
     super(message);
@@ -49,6 +62,13 @@ export class BookingStore {
     if (!input.room || !input.title) throw new BookingError(400, '회의실과 제목은 필수입니다');
     if (Number.isNaN(start) || Number.isNaN(end)) throw new BookingError(400, '시작·종료 시각 형식이 맞지 않습니다');
     if (end <= start) throw new BookingError(400, '종료 시각은 시작 시각보다 뒤여야 합니다');
+    if (!withinBusinessHours(start, end)) {
+      throw new BookingError(
+        400,
+        '예약은 업무 시간(한국 시간 09:00~18:00) 안에 있어야 합니다',
+        'OUTSIDE_BUSINESS_HOURS',
+      );
+    }
     const duration = end - start;
     if (duration < DURATION_MIN_MS) {
       throw new BookingError(400, '예약은 15분 이상이어야 합니다', 'DURATION_TOO_SHORT');
