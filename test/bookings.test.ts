@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BookingError, BookingStore } from '../src/bookings.ts';
 
-const at = (hour: number) => `2026-10-08T${String(hour).padStart(2, '0')}:00:00+09:00`;
+const at = (hour: number, minute = 0) =>
+  `2026-10-08T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`;
 
 describe('BookingStore', () => {
   it('예약을 만들고 시작 시각 순으로 돌려준다', () => {
@@ -27,6 +28,26 @@ describe('BookingStore', () => {
     expect(bad({ room: '', title: 't', start: at(9), end: at(10) })).toThrow(BookingError);
     expect(bad({ room: 'A', title: 't', start: 'tomorrow', end: at(10) })).toThrow('형식');
     expect(bad({ room: 'A', title: 't', start: at(10), end: at(9) })).toThrow('뒤여야');
+  });
+
+  it('예약 길이가 15분보다 짧으면 400 DURATION_TOO_SHORT, 메시지에 "15분"', () => {
+    const store = new BookingStore();
+    expect(() => store.create({ room: 'A', title: 't', start: at(9), end: at(9, 14) })).toThrow(
+      expect.objectContaining({ status: 400, code: 'DURATION_TOO_SHORT', message: expect.stringContaining('15분') }),
+    );
+  });
+
+  it('예약 길이가 4시간을 넘으면 400 DURATION_TOO_LONG, 메시지에 "4시간"', () => {
+    const store = new BookingStore();
+    expect(() => store.create({ room: 'A', title: 't', start: at(9), end: at(13, 1) })).toThrow(
+      expect.objectContaining({ status: 400, code: 'DURATION_TOO_LONG', message: expect.stringContaining('4시간') }),
+    );
+  });
+
+  it('정확히 15분, 정확히 4시간인 예약은 받는다', () => {
+    const store = new BookingStore();
+    expect(store.create({ room: 'A', title: '짧게', start: at(9), end: at(9, 15) }).id).toBe('bk-1');
+    expect(store.create({ room: 'B', title: '길게', start: at(9), end: at(13) }).id).toBe('bk-2');
   });
 
   it('취소한 예약은 사라지고, 없는 예약은 404', () => {

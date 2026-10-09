@@ -11,10 +11,17 @@ export interface Booking {
 
 export type BookingInput = Omit<Booking, 'id'>;
 
+const MINUTE = 60 * 1000;
+/** 예약 길이(종료 - 시작) 하한·상한. 경계값은 받는다. */
+export const DURATION_MIN_MS = 15 * MINUTE;
+export const DURATION_MAX_MS = 4 * 60 * MINUTE;
+
 export class BookingError extends Error {
   constructor(
     readonly status: 400 | 404 | 409,
     message: string,
+    /** 클라이언트가 분기할 수 있는 오류 코드 (예약 길이 검증) */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'BookingError';
@@ -42,6 +49,13 @@ export class BookingStore {
     if (!input.room || !input.title) throw new BookingError(400, '회의실과 제목은 필수입니다');
     if (Number.isNaN(start) || Number.isNaN(end)) throw new BookingError(400, '시작·종료 시각 형식이 맞지 않습니다');
     if (end <= start) throw new BookingError(400, '종료 시각은 시작 시각보다 뒤여야 합니다');
+    const duration = end - start;
+    if (duration < DURATION_MIN_MS) {
+      throw new BookingError(400, '예약은 15분 이상이어야 합니다', 'DURATION_TOO_SHORT');
+    }
+    if (duration > DURATION_MAX_MS) {
+      throw new BookingError(400, '예약은 4시간을 넘을 수 없습니다', 'DURATION_TOO_LONG');
+    }
 
     const conflict = this.list(input.room).find((b) => Date.parse(b.start) < end && start < Date.parse(b.end));
     if (conflict) throw new BookingError(409, `${input.room}은 이미 예약돼 있습니다 (${conflict.id})`);

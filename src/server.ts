@@ -26,7 +26,7 @@ export function handler(store: BookingStore, rooms: RoomStore = new RoomStore())
       }
       return send(res, 404, { error: '없는 경로입니다' });
     } catch (error) {
-      if (error instanceof BookingError) return send(res, error.status, { error: error.message });
+      if (error instanceof BookingError) return send(res, error.status, { error: error.message, code: error.code });
       return send(res, 500, { error: '서버 오류' });
     }
   };
