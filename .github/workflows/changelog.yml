@@ -14,10 +14,16 @@ jobs:
         with:
           fetch-depth: 0
       - name: CHANGELOG.md 갱신 확인
+        env:
+          TAG: ${{ vars.CHANGELOG_TAG }}
         run: |
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qx CHANGELOG.md; then
-            echo "CHANGELOG.md가 바뀌었다"
-          else
+          added=$(git diff "origin/${{ github.base_ref }}...HEAD" -- CHANGELOG.md | grep '^+- ' || true)
+          if [ -z "$added" ]; then
             echo "::error file=CHANGELOG.md::PR마다 CHANGELOG.md의 '## 미배포' 아래에 '- [이슈 키] 바뀐 내용' 한 줄을 추가해야 합니다"
             exit 1
           fi
+          if [ -n "$TAG" ] && ! printf '%s\n' "$added" | grep -qF "[$TAG]"; then
+            echo "::error file=CHANGELOG.md::추가한 CHANGELOG 줄 끝에 릴리스 태그 [$TAG]를 붙여야 합니다 (예: '- [ELMJ-1] 바뀐 내용 [$TAG]')"
+            exit 1
+          fi
+          echo "CHANGELOG.md 확인 통과"
