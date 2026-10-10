@@ -20,4 +20,12 @@ export class RoomStore {
   get(id: string): Room | undefined {
     return this.rooms.get(id);
   }
+
+  /** id 순 목록. minCapacity를 주면 수용 인원이 그 이상인 회의실만 */
+  list(minCapacity = 0): Room[] {
+    return [...this.rooms.values()]
+      .filter((r) => r.capacity >= minCapacity)
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+      .map((r) => ({ id: r.id, name: r.name, capacity: r.capacity }));
+  }
 }
