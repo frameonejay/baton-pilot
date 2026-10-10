@@ -261,7 +261,9 @@ describe('BookingStore 예약 변경', () => {
     const store = new BookingStore();
     const b = store.create({ room: 'A', title: '회의', start: at(10), end: at(11) });
     const other = store.create({ room: 'A', title: '다른 회의', start: at(13), end: at(14) });
-    return { store, b, other };
+    // 실패 뒤 상태를 비교할 스냅숏. store가 들고 있는 객체와 같은 참조면 제자리 변경을 잡지 못한다
+    const before = structuredClone([b, other]);
+    return { store, b, other, before };
   };
 
   it('준 필드만 바꾸고 바뀐 예약 전체를 돌려준다. id와 회의실은 그대로다', () => {
@@ -284,9 +286,9 @@ describe('BookingStore 예약 변경', () => {
   });
 
   it('같은 회의실의 다른 예약과 겹치면 409, 예약은 그대로다', () => {
-    const { store, b, other } = seeded();
+    const { store, b, before } = seeded();
     expect(() => store.update(b.id, { end: at(13, 30) })).toThrow(expect.objectContaining({ status: 409 }));
-    expect(store.list()).toEqual([b, other]);
+    expect(store.list()).toEqual(before);
   });
 
   it('자기 자신과는 겹침으로 보지 않고, 맞닿는 시간이나 다른 회의실 예약은 받는다', () => {
@@ -302,7 +304,7 @@ describe('BookingStore 예약 변경', () => {
   });
 
   it('바꾼 결과가 생성 규칙에 맞지 않으면 400, 예약은 그대로다', () => {
-    const { store, b, other } = seeded();
+    const { store, b, before } = seeded();
     const bad = (patch: Parameters<BookingStore['update']>[1]) => () => store.update(b.id, patch);
     expect(bad({ title: '' })).toThrow(
       expect.objectContaining({ status: 400, message: expect.stringContaining('제목') }),
@@ -315,17 +317,17 @@ describe('BookingStore 예약 변경', () => {
     );
     expect(bad({ end: at(10, 10) })).toThrow(expect.objectContaining({ status: 400, code: 'DURATION_TOO_SHORT' }));
     expect(bad({ end: at(18, 30) })).toThrow(expect.objectContaining({ status: 400, code: 'OUTSIDE_BUSINESS_HOURS' }));
-    expect(store.list()).toEqual([b, other]);
+    expect(store.list()).toEqual(before);
   });
 
   it('문자열이 아닌 title·start·end는 400', () => {
-    const { store, b } = seeded();
+    const { store, b, before } = seeded();
     for (const patch of [{ title: 1 }, { start: 1 }, { end: null }]) {
       expect(() => store.update(b.id, patch as unknown as Parameters<BookingStore['update']>[1])).toThrow(
         expect.objectContaining({ status: 400 }),
       );
     }
-    expect(store.get(b.id)).toEqual(b);
+    expect(store.get(b.id)).toEqual(before[0]);
   });
 
   it('변경은 새 예약의 id 순번을 건너뛰게 하지 않는다', () => {
