@@ -13,7 +13,7 @@ npm start   # http://localhost:3000
 | --- | --- | --- |
 | GET | `/bookings?room=A&limit=20&offset=0` | 예약 목록 `{ items, total, limit, offset }` (시작 시각 순). limit은 1~100(기본 20), offset은 0 이상(기본 0). 범위를 벗어나거나 정수가 아니면 400 |
 | POST | `/bookings` | `{ room, title, start, end }`. 겹치면 409 |
-| DELETE | `/bookings/:id` | 예약 취소. 없으면 404 |
+| DELETE | `/bookings/:id` | 예약 취소. 시작까지 1시간이 안 남았거나 이미 시작했으면 409, 없으면 404 |
 | GET | `/rooms/:id` | 회의실 `{ id, name, capacity }`. 없으면 404 |
 
 ## 규칙
