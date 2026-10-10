@@ -19,6 +19,7 @@ npm start   # http://localhost:3000
 
 ## 규칙
 
-- 테스트를 먼저 쓰고 구현한다. 커밋은 `test(KEY): …` 다음에 `feat(KEY): …`.
+- 테스트를 먼저 쓰고 구현한다. 커밋은 새 기능이면 `test(KEY): …` 다음에 `feat(KEY): …`, 버그 수정이면 `test(KEY): …` 다음에 `fix(KEY): …`.
+- CI 실패나 리뷰 지적을 고치는 후속 커밋도 `fix(KEY): …`로 쓴다.
 - 오류 메시지는 한국어로 쓴다.
 - `infra/`와 `.github/workflows/`는 사람만 고친다.
