@@ -183,6 +183,23 @@ describe('GET /bookings 페이지네이션', () => {
   });
 });
 
+describe('GET /bookings 정렬', () => {
+  it('오프셋이 달라도 실제 시각 순이고, 시작 시각이 같으면 먼저 만든 예약이 앞이다', async () => {
+    const store = new BookingStore();
+    store.create({ room: 'A', title: '11시', start: '2026-10-08T02:00:00Z', end: '2026-10-08T03:00:00Z' });
+    store.create({
+      room: 'B',
+      title: '10시 먼저',
+      start: '2026-10-08T10:00:00+09:00',
+      end: '2026-10-08T11:00:00+09:00',
+    });
+    store.create({ room: 'A', title: '10시 나중', start: '2026-10-08T01:00:00Z', end: '2026-10-08T02:00:00Z' });
+    const res = await get(store, '/bookings');
+    expect(res.status).toBe(200);
+    expect(res.body.items.map((b: { title: string }) => b.title)).toEqual(['10시 먼저', '10시 나중', '11시']);
+  });
+});
+
 async function del(store: BookingStore, id: string) {
   const req = Object.assign(Readable.from([]), {
     method: 'DELETE',

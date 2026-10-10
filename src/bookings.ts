@@ -62,9 +62,10 @@ export class BookingStore {
   private readonly bookings = new Map<string, Booking>();
   private seq = 0;
 
+  /** 실제 시작 시각 순. 같으면 먼저 만든 예약이 앞이다 (Map은 넣은 순서를 지키고 sort는 안정 정렬이다). */
   list(room?: string): Booking[] {
     const all = [...this.bookings.values()];
-    return (room ? all.filter((b) => b.room === room) : all).sort((a, b) => a.start.localeCompare(b.start));
+    return (room ? all.filter((b) => b.room === room) : all).sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   }
 
   get(id: string): Booking {
