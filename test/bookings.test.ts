@@ -337,3 +337,21 @@ describe('BookingStore 예약 변경', () => {
     expect(store.create({ room: 'A', title: '새 회의', start: at(15), end: at(16) }).id).toBe('bk-3');
   });
 });
+
+describe('BookingStore 참석 인원', () => {
+  const slot = { room: 'A', title: 't', start: at(9), end: at(10) };
+
+  it('attendees를 주면 예약에 들어가고, 없으면 예약에 attendees가 없다', () => {
+    const store = new BookingStore();
+    expect(store.create({ ...slot, attendees: 3 }).attendees).toBe(3);
+    expect(store.create({ ...slot, room: 'B' })).not.toHaveProperty('attendees');
+  });
+
+  it.each([0, -1, 2.5, '3', null, true])('attendees가 %s이면 400과 한국어 오류 메시지', (attendees) => {
+    const store = new BookingStore();
+    expect(() => store.create({ ...slot, attendees: attendees as number })).toThrow(
+      expect.objectContaining({ status: 400, message: 'attendees는 1 이상의 정수여야 합니다' }),
+    );
+    expect(store.list()).toEqual([]);
+  });
+});

@@ -391,3 +391,58 @@ describe('PATCH /bookings/:id 예약 변경', () => {
     expect(res.body.id).toBe('bk-3');
   });
 });
+
+describe('POST /bookings 참석 인원과 회의실 정원', () => {
+  const body = { ...slot, title: '회의' };
+
+  it('attendees를 주면 201과 attendees가 든 예약을 돌려준다', async () => {
+    const res = await post({ ...body, attendees: 4 });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ id: 'bk-1', ...body, attendees: 4 });
+  });
+
+  it.each([0, 2.5, '3', null])('attendees가 %s이면 400과 한국어 오류 메시지', async (attendees) => {
+    const store = new BookingStore();
+    const res = await post({ ...body, attendees }, store);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('attendees는 1 이상의 정수여야 합니다');
+    expect(store.list()).toEqual([]);
+  });
+
+  it('정원(회의실 A 6명, B 10명)을 넘으면 400과 "정원"이 든 메시지, 예약은 만들지 않는다', async () => {
+    const store = new BookingStore();
+    const overA = await post({ ...body, attendees: 7 }, store);
+    expect(overA.status).toBe(400);
+    expect(overA.body.error).toContain('정원');
+    const overB = await post({ ...body, room: 'B', attendees: 11 }, store);
+    expect(overB.status).toBe(400);
+    expect(overB.body.error).toContain('정원');
+    expect(store.list()).toEqual([]);
+  });
+
+  it('정원과 같은 인원은 받는다', async () => {
+    const store = new BookingStore();
+    expect((await post({ ...body, attendees: 6 }, store)).status).toBe(201);
+    expect((await post({ ...body, room: 'B', attendees: 10 }, store)).status).toBe(201);
+  });
+
+  it('반복 예약도 정원을 넘으면 400, 아무것도 만들지 않는다', async () => {
+    const store = new BookingStore();
+    const res = await post({ ...body, attendees: 7, repeatWeeks: 2 }, store);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('정원');
+    expect(store.list()).toEqual([]);
+  });
+
+  it('정원을 모르는 회의실은 인원을 확인하지 않는다', async () => {
+    const res = await post({ ...body, room: 'Z', attendees: 100 });
+    expect(res.status).toBe(201);
+    expect(res.body.attendees).toBe(100);
+  });
+
+  it('attendees가 없으면 인원을 확인하지 않고 응답에도 attendees가 없다', async () => {
+    const res = await post(body);
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ id: 'bk-1', ...body });
+  });
+});

@@ -1,5 +1,5 @@
 import { type IncomingMessage, type ServerResponse, createServer } from 'node:http';
-import { BookingError, type BookingInput, type BookingPatch, BookingStore } from './bookings.ts';
+import { BookingError, type BookingInput, type BookingPatch, BookingStore, checkAttendees } from './bookings.ts';
 import { RoomStore } from './rooms.ts';
 
 /** GET /bookings[?room=&limit=&offset=], POST /bookings, PATCH /bookings/:id, DELETE /bookings/:id, GET /rooms[?minCapacity=], GET /rooms/:id */
@@ -15,6 +15,7 @@ export function handler(store: BookingStore, rooms: RoomStore = new RoomStore())
       }
       if (req.method === 'POST' && url.pathname === '/bookings') {
         const body = (await readJson(req)) as BookingInput & { repeatWeeks?: unknown };
+        checkAttendees(body.attendees, rooms.get(body.room)?.capacity);
         if (body.repeatWeeks === undefined) return send(res, 201, store.create(body));
         const { repeatWeeks, ...input } = body;
         return send(res, 201, store.createWeekly(input, repeatWeeks as number));

@@ -7,6 +7,8 @@ export interface Booking {
   start: string;
   /** ISO 8601, start보다 뒤 */
   end: string;
+  /** 참석 인원. 선택, 1 이상의 정수 */
+  attendees?: number;
 }
 
 export type BookingInput = Omit<Booking, 'id'>;
@@ -47,6 +49,17 @@ function shiftDays(iso: string, days: number): string {
 function withinBusinessHours(start: number, end: number): boolean {
   const kstMidnight = Math.floor((start + KST_OFFSET_MS) / DAY) * DAY - KST_OFFSET_MS;
   return start >= kstMidnight + BUSINESS_OPEN_MS && end <= kstMidnight + BUSINESS_CLOSE_MS;
+}
+
+/** attendees는 없거나 1 이상의 정수여야 한다. capacity(회의실 정원)를 알면 그 이하여야 한다. */
+export function checkAttendees(attendees: unknown, capacity?: number): void {
+  if (attendees === undefined) return;
+  if (typeof attendees !== 'number' || !Number.isInteger(attendees) || attendees < 1) {
+    throw new BookingError(400, 'attendees는 1 이상의 정수여야 합니다');
+  }
+  if (capacity !== undefined && attendees > capacity) {
+    throw new BookingError(400, `참석 인원 ${attendees}명이 회의실 정원 ${capacity}명을 넘습니다`);
+  }
 }
 
 export class BookingError extends Error {
@@ -121,6 +134,7 @@ export class BookingStore {
     const start = Date.parse(input.start);
     const end = Date.parse(input.end);
     if (!input.room || !input.title) throw new BookingError(400, '회의실과 제목은 필수입니다');
+    checkAttendees(input.attendees);
     if (Number.isNaN(start) || Number.isNaN(end)) throw new BookingError(400, '시작·종료 시각 형식이 맞지 않습니다');
     if (end <= start) throw new BookingError(400, '종료 시각은 시작 시각보다 뒤여야 합니다');
     if (!withinBusinessHours(start, end)) {
