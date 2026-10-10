@@ -18,6 +18,8 @@ export const DURATION_MAX_MS = 4 * 60 * MINUTE;
 
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
+/** 시작 시각까지 이만큼 이상 남아야 취소할 수 있다 */
+const CANCEL_DEADLINE_MS = HOUR;
 /** 업무 시간은 한국 시간(+09:00) 기준 같은 날 09:00~18:00. 경계값은 받는다. */
 const KST_OFFSET_MS = 9 * HOUR;
 const BUSINESS_OPEN_MS = 9 * HOUR;
@@ -86,8 +88,12 @@ export class BookingStore {
     return booking;
   }
 
+  /** 시작까지 1시간 이상 남은 예약만 취소한다. 정확히 1시간 남았으면 받는다. */
   cancel(id: string): void {
-    this.get(id);
+    const booking = this.get(id);
+    if (Date.parse(booking.start) - Date.now() < CANCEL_DEADLINE_MS) {
+      throw new BookingError(409, '시작 1시간 전부터는 예약을 취소할 수 없습니다');
+    }
     this.bookings.delete(id);
   }
 }
