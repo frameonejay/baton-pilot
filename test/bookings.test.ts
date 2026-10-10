@@ -304,9 +304,15 @@ describe('BookingStore 예약 변경', () => {
   it('바꾼 결과가 생성 규칙에 맞지 않으면 400, 예약은 그대로다', () => {
     const { store, b, other } = seeded();
     const bad = (patch: Parameters<BookingStore['update']>[1]) => () => store.update(b.id, patch);
-    expect(bad({ title: '' })).toThrow(expect.objectContaining({ status: 400, message: expect.stringContaining('제목') }));
-    expect(bad({ start: 'tomorrow' })).toThrow(expect.objectContaining({ status: 400, message: expect.stringContaining('형식') }));
-    expect(bad({ start: at(11) })).toThrow(expect.objectContaining({ status: 400, message: expect.stringContaining('뒤여야') }));
+    expect(bad({ title: '' })).toThrow(
+      expect.objectContaining({ status: 400, message: expect.stringContaining('제목') }),
+    );
+    expect(bad({ start: 'tomorrow' })).toThrow(
+      expect.objectContaining({ status: 400, message: expect.stringContaining('형식') }),
+    );
+    expect(bad({ start: at(11) })).toThrow(
+      expect.objectContaining({ status: 400, message: expect.stringContaining('뒤여야') }),
+    );
     expect(bad({ end: at(10, 10) })).toThrow(expect.objectContaining({ status: 400, code: 'DURATION_TOO_SHORT' }));
     expect(bad({ end: at(18, 30) })).toThrow(expect.objectContaining({ status: 400, code: 'OUTSIDE_BUSINESS_HOURS' }));
     expect(store.list()).toEqual([b, other]);

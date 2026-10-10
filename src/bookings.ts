@@ -11,6 +11,9 @@ export interface Booking {
 
 export type BookingInput = Omit<Booking, 'id'>;
 
+/** 예약 변경에서 바꿀 수 있는 필드. 준 것만 바꾼다. */
+export type BookingPatch = Partial<Pick<Booking, 'title' | 'start' | 'end'>>;
+
 const MINUTE = 60 * 1000;
 /** 예약 길이(종료 - 시작) 하한·상한. 경계값은 받는다. */
 export const DURATION_MIN_MS = 15 * MINUTE;
@@ -94,8 +97,27 @@ export class BookingStore {
     return inputs.map((each) => this.insert(each));
   }
 
-  /** 입력 규칙과 같은 회의실의 겹침을 확인한다. 저장하지 않는다. */
-  private validate(input: BookingInput): void {
+  /** title·start·end 중 준 것만 바꾼다. 회의실과 id는 그대로다. 실패하면 아무것도 바꾸지 않는다. */
+  update(id: string, patch: BookingPatch): Booking {
+    const current = this.get(id);
+    if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) {
+      throw new BookingError(400, '본문은 객체여야 합니다');
+    }
+    const changes: BookingPatch = {};
+    for (const key of ['title', 'start', 'end'] as const) {
+      const value: unknown = patch[key];
+      if (value === undefined) continue;
+      if (typeof value !== 'string') throw new BookingError(400, `${key}는 문자열이어야 합니다`);
+      changes[key] = value;
+    }
+    const updated: Booking = { ...current, ...changes };
+    this.validate(updated, id);
+    this.bookings.set(id, updated);
+    return updated;
+  }
+
+  /** 입력 규칙과 같은 회의실의 겹침을 확인한다. 저장하지 않는다. excludeId 예약과는 겹침으로 보지 않는다. */
+  private validate(input: BookingInput, excludeId?: string): void {
     const start = Date.parse(input.start);
     const end = Date.parse(input.end);
     if (!input.room || !input.title) throw new BookingError(400, '회의실과 제목은 필수입니다');
@@ -116,7 +138,9 @@ export class BookingStore {
       throw new BookingError(400, '예약은 4시간을 넘을 수 없습니다', 'DURATION_TOO_LONG');
     }
 
-    const conflict = this.list(input.room).find((b) => Date.parse(b.start) < end && start < Date.parse(b.end));
+    const conflict = this.list(input.room).find(
+      (b) => b.id !== excludeId && Date.parse(b.start) < end && start < Date.parse(b.end),
+    );
     if (conflict) throw new BookingError(409, `${input.room}은 이미 예약돼 있습니다 (${conflict.id})`);
   }
 
