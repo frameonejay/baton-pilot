@@ -2,7 +2,7 @@ import { type IncomingMessage, type ServerResponse, createServer } from 'node:ht
 import { BookingError, type BookingInput, type BookingPatch, BookingStore } from './bookings.ts';
 import { RoomStore } from './rooms.ts';
 
-/** GET /bookings[?room=&limit=&offset=], POST /bookings, PATCH /bookings/:id, DELETE /bookings/:id, GET /rooms/:id */
+/** GET /bookings[?room=&limit=&offset=], POST /bookings, PATCH /bookings/:id, DELETE /bookings/:id, GET /rooms[?minCapacity=], GET /rooms/:id */
 export function handler(store: BookingStore, rooms: RoomStore = new RoomStore()) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -26,6 +26,10 @@ export function handler(store: BookingStore, rooms: RoomStore = new RoomStore())
       if (req.method === 'DELETE' && match?.[1]) {
         store.cancel(match[1]);
         return send(res, 204, null);
+      }
+      if (req.method === 'GET' && url.pathname === '/rooms') {
+        const minCapacity = intParam(url.searchParams, 'minCapacity', 0, 1, Number.MAX_SAFE_INTEGER);
+        return send(res, 200, { items: rooms.list(minCapacity) });
       }
       const roomMatch = url.pathname.match(/^\/rooms\/([\w-]+)$/);
       if (req.method === 'GET' && roomMatch?.[1]) {

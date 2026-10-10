@@ -15,6 +15,7 @@ npm start   # http://localhost:3000
 | POST | `/bookings` | `{ room, title, start, end, repeatWeeks? }`. 겹치면 409. repeatWeeks(2~12의 정수, 아니면 400)를 주면 시작·종료를 7일씩 옮겨 그 수만큼 만들고 예약 배열(첫 주부터)을 돌려준다. 한 주라도 안 되면 아무것도 만들지 않는다 |
 | PATCH | `/bookings/:id` | `{ title?, start?, end? }` 중 준 것만 바꾸고 200과 바뀐 예약을 돌려준다. 회의실·id는 바뀌지 않는다. 다른 예약과 겹치면 409, 없으면 404, 생성 규칙에 어긋나면 400 |
 | DELETE | `/bookings/:id` | 예약 취소. 시작까지 1시간이 안 남았거나 이미 시작했으면 409, 없으면 404 |
+| GET | `/rooms?minCapacity=N` | 회의실 목록 `{ items }` (id 순, 각 항목 `{ id, name, capacity }`). minCapacity를 주면 수용 인원이 N 이상인 회의실만. N이 1 이상의 정수가 아니면 400, 맞는 회의실이 없으면 빈 배열 |
 | GET | `/rooms/:id` | 회의실 `{ id, name, capacity }`. 없으면 404 |
 
 ## 규칙
