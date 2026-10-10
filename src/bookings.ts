@@ -25,6 +25,21 @@ const KST_OFFSET_MS = 9 * HOUR;
 const BUSINESS_OPEN_MS = 9 * HOUR;
 const BUSINESS_CLOSE_MS = 18 * HOUR;
 
+/** 주간 반복 예약 횟수(repeatWeeks) 하한·상한. 경계값은 받는다. */
+export const REPEAT_WEEKS_MIN = 2;
+export const REPEAT_WEEKS_MAX = 12;
+
+/** ISO 시각을 days일 옮긴다. 입력에 적힌 오프셋(+09:00 등)을 그대로 쓴다. */
+function shiftDays(iso: string, days: number): string {
+  if (days === 0) return iso;
+  const shifted = Date.parse(iso) + days * DAY;
+  const offset = iso.match(/[+-](\d{2}):(\d{2})$/);
+  if (!offset) return new Date(shifted).toISOString();
+  const sign = offset[0].startsWith('-') ? -1 : 1;
+  const offsetMs = sign * (Number(offset[1]) * HOUR + Number(offset[2]) * MINUTE);
+  return new Date(shifted + offsetMs).toISOString().replace('Z', offset[0]);
+}
+
 /** 시작 시각이 속한 한국 날짜의 업무 시간 안에 시작·종료가 모두 들어가는지 */
 function withinBusinessHours(start: number, end: number): boolean {
   const kstMidnight = Math.floor((start + KST_OFFSET_MS) / DAY) * DAY - KST_OFFSET_MS;
@@ -59,6 +74,27 @@ export class BookingStore {
   }
 
   create(input: BookingInput): Booking {
+    this.validate(input);
+    return this.insert(input);
+  }
+
+  /** 시작·종료를 7일씩 옮겨 weeks개를 첫 주부터 만든다. 하나라도 안 되면 아무것도 만들지 않는다. */
+  createWeekly(input: BookingInput, weeks: number): Booking[] {
+    if (!Number.isInteger(weeks) || weeks < REPEAT_WEEKS_MIN || weeks > REPEAT_WEEKS_MAX) {
+      throw new BookingError(400, `repeatWeeks는 ${REPEAT_WEEKS_MIN}~${REPEAT_WEEKS_MAX}의 정수여야 합니다`);
+    }
+    this.validate(input);
+    const inputs = Array.from({ length: weeks }, (_, i) => ({
+      ...input,
+      start: shiftDays(input.start, 7 * i),
+      end: shiftDays(input.end, 7 * i),
+    }));
+    for (const each of inputs) this.validate(each);
+    return inputs.map((each) => this.insert(each));
+  }
+
+  /** 입력 규칙과 같은 회의실의 겹침을 확인한다. 저장하지 않는다. */
+  private validate(input: BookingInput): void {
     const start = Date.parse(input.start);
     const end = Date.parse(input.end);
     if (!input.room || !input.title) throw new BookingError(400, '회의실과 제목은 필수입니다');
@@ -81,7 +117,9 @@ export class BookingStore {
 
     const conflict = this.list(input.room).find((b) => Date.parse(b.start) < end && start < Date.parse(b.end));
     if (conflict) throw new BookingError(409, `${input.room}은 이미 예약돼 있습니다 (${conflict.id})`);
+  }
 
+  private insert(input: BookingInput): Booking {
     this.seq += 1;
     const booking: Booking = { ...input, id: `bk-${this.seq}` };
     this.bookings.set(booking.id, booking);

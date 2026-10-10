@@ -14,7 +14,10 @@ export function handler(store: BookingStore, rooms: RoomStore = new RoomStore())
         return send(res, 200, { items: all.slice(offset, offset + limit), total: all.length, limit, offset });
       }
       if (req.method === 'POST' && url.pathname === '/bookings') {
-        return send(res, 201, store.create((await readJson(req)) as BookingInput));
+        const body = (await readJson(req)) as BookingInput & { repeatWeeks?: unknown };
+        if (body.repeatWeeks === undefined) return send(res, 201, store.create(body));
+        const { repeatWeeks, ...input } = body;
+        return send(res, 201, store.createWeekly(input, repeatWeeks as number));
       }
       const match = url.pathname.match(/^\/bookings\/([\w-]+)$/);
       if (req.method === 'DELETE' && match?.[1]) {

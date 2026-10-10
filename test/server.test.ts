@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BookingStore } from '../src/bookings.ts';
 import { handler } from '../src/server.ts';
 
-async function post(body: unknown) {
+async function post(body: unknown, store = new BookingStore()) {
   const req = Object.assign(Readable.from([Buffer.from(JSON.stringify(body))]), {
     method: 'POST',
     url: '/bookings',
@@ -18,7 +18,7 @@ async function post(body: unknown) {
       out.body = chunk ?? '';
     },
   } as unknown as ServerResponse;
-  await handler(new BookingStore())(req, res);
+  await handler(store)(req, res);
   return { status: out.status, body: out.body ? JSON.parse(out.body) : null };
 }
 
@@ -241,5 +241,54 @@ describe('DELETE /bookings/:id 취소 정책', () => {
     vi.useFakeTimers({ now: new Date('2026-10-08T12:00:00+09:00') });
     const res = await del(new BookingStore(), 'bk-404');
     expect(res.status).toBe(404);
+  });
+});
+
+describe('POST /bookings 주간 반복 예약', () => {
+  const body = { ...slot, title: '주간 회의' };
+
+  it('repeatWeeks가 n이면 201과 n개 예약의 배열을 첫 주부터 돌려준다', async () => {
+    const store = new BookingStore();
+    const res = await post({ ...body, repeatWeeks: 3 }, store);
+    expect(res.status).toBe(201);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.map((b: { start: string }) => Date.parse(b.start))).toEqual(
+      ['2026-10-08', '2026-10-15', '2026-10-22'].map((d) => Date.parse(`${d}T09:00:00+09:00`)),
+    );
+    expect(res.body.map((b: { end: string }) => Date.parse(b.end))).toEqual(
+      ['2026-10-08', '2026-10-15', '2026-10-22'].map((d) => Date.parse(`${d}T10:00:00+09:00`)),
+    );
+    expect(res.body[0]).toEqual({ id: 'bk-1', room: 'A', title: '주간 회의', start: slot.start, end: slot.end });
+    expect(store.list()).toEqual(res.body);
+  });
+
+  it.each([1, 13, 2.5, '2', null, true])('repeatWeeks가 %s이면 400과 한국어 오류 메시지', async (repeatWeeks) => {
+    const store = new BookingStore();
+    const res = await post({ ...body, repeatWeeks }, store);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('repeatWeeks는 2~12의 정수여야 합니다');
+    expect(store.list()).toEqual([]);
+  });
+
+  it('한 주라도 기존 예약과 겹치면 409, 아무것도 만들지 않는다', async () => {
+    const store = new BookingStore();
+    store.create({ ...body, title: '선약', start: '2026-10-22T09:30:00+09:00', end: '2026-10-22T10:30:00+09:00' });
+    const res = await post({ ...body, repeatWeeks: 3 }, store);
+    expect(res.status).toBe(409);
+    expect(store.list()).toHaveLength(1);
+  });
+
+  it('규칙에 맞지 않으면 400, 아무것도 만들지 않는다', async () => {
+    const store = new BookingStore();
+    const res = await post({ ...body, end: '2026-10-08T09:10:00+09:00', repeatWeeks: 2 }, store);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('DURATION_TOO_SHORT');
+    expect(store.list()).toEqual([]);
+  });
+
+  it('repeatWeeks가 없으면 지금처럼 예약 하나를 객체로 돌려준다', async () => {
+    const res = await post(body);
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ id: 'bk-1', ...body });
   });
 });
