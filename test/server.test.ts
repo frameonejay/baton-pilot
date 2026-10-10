@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BookingStore } from '../src/bookings.ts';
 import { handler } from '../src/server.ts';
 
@@ -180,5 +180,66 @@ describe('GET /bookings 페이지네이션', () => {
     });
     const none = await get(seeded(), '/bookings?room=Z');
     expect(none.body).toEqual({ items: [], total: 0, limit: 20, offset: 0 });
+  });
+});
+
+async function del(store: BookingStore, id: string) {
+  const req = Object.assign(Readable.from([]), {
+    method: 'DELETE',
+    url: `/bookings/${id}`,
+  }) as unknown as IncomingMessage;
+  const out = { status: 0, body: '' };
+  const res = {
+    writeHead(status: number) {
+      out.status = status;
+    },
+    end(chunk?: string) {
+      out.body = chunk ?? '';
+    },
+  } as unknown as ServerResponse;
+  await handler(store)(req, res);
+  return { status: out.status, body: out.body ? JSON.parse(out.body) : null };
+}
+
+describe('DELETE /bookings/:id 취소 정책', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** 10:00~11:00 예약 하나 */
+  function seeded() {
+    const store = new BookingStore();
+    const b = store.create({
+      ...slot,
+      title: 't',
+      start: '2026-10-08T10:00:00+09:00',
+      end: '2026-10-08T11:00:00+09:00',
+    });
+    return { store, b };
+  }
+
+  it('시작까지 정확히 1시간 남았으면 204', async () => {
+    vi.useFakeTimers({ now: new Date('2026-10-08T09:00:00+09:00') });
+    const { store, b } = seeded();
+    const res = await del(store, b.id);
+    expect(res.status).toBe(204);
+    expect(store.list()).toEqual([]);
+  });
+
+  it('1시간이 안 남았거나 이미 시작했으면 409와 "1시간"이 든 메시지, 예약은 남는다', async () => {
+    const { store, b } = seeded();
+    for (const now of ['2026-10-08T09:30:00+09:00', '2026-10-08T10:30:00+09:00']) {
+      vi.useFakeTimers({ now: new Date(now) });
+      const res = await del(store, b.id);
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain('1시간');
+    }
+    expect(store.list()).toEqual([b]);
+  });
+
+  it('없는 예약은 404', async () => {
+    vi.useFakeTimers({ now: new Date('2026-10-08T12:00:00+09:00') });
+    const res = await del(new BookingStore(), 'bk-404');
+    expect(res.status).toBe(404);
   });
 });
