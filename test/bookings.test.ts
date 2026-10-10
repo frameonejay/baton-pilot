@@ -181,3 +181,59 @@ describe('BookingStore 취소 정책', () => {
     expect(() => store.cancel('bk-404')).toThrow(expect.objectContaining({ status: 404 }));
   });
 });
+
+describe('BookingStore 주간 반복 예약', () => {
+  const week = (n: number, hour: number) =>
+    `2026-10-${String(8 + 7 * n).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00:00+09:00`;
+  const base = { room: 'A', title: '주간 회의', start: week(0, 10), end: week(0, 11) };
+
+  it('시작·종료를 7일씩 옮겨 n개를 첫 주부터 만든다', () => {
+    const store = new BookingStore();
+    const created = store.createWeekly(base, 3);
+    expect(created.map((b) => [b.id, b.room, b.title])).toEqual([
+      ['bk-1', 'A', '주간 회의'],
+      ['bk-2', 'A', '주간 회의'],
+      ['bk-3', 'A', '주간 회의'],
+    ]);
+    expect(created.map((b) => [Date.parse(b.start), Date.parse(b.end)])).toEqual(
+      [0, 1, 2].map((n) => [Date.parse(week(n, 10)), Date.parse(week(n, 11))]),
+    );
+    expect(store.list('A')).toEqual(created);
+  });
+
+  it('입력한 시각의 오프셋을 그대로 쓴다', () => {
+    const created = new BookingStore().createWeekly(base, 2);
+    expect(created[0]).toMatchObject({ start: base.start, end: base.end });
+    expect(created[1]).toMatchObject({ start: '2026-10-15T10:00:00.000+09:00', end: '2026-10-15T11:00:00.000+09:00' });
+  });
+
+  it('경계값 2와 12를 받는다', () => {
+    expect(new BookingStore().createWeekly(base, 2)).toHaveLength(2);
+    expect(new BookingStore().createWeekly(base, 12)).toHaveLength(12);
+  });
+
+  it.each([1, 13, 0, -2, 2.5, '3', null, Number.NaN])('repeatWeeks가 %s이면 400, 아무것도 만들지 않는다', (weeks) => {
+    const store = new BookingStore();
+    expect(() => store.createWeekly(base, weeks as number)).toThrow(
+      expect.objectContaining({ status: 400, message: 'repeatWeeks는 2~12의 정수여야 합니다' }),
+    );
+    expect(store.list()).toEqual([]);
+  });
+
+  it('어느 한 주라도 기존 예약과 겹치면 409, 아무것도 만들지 않는다', () => {
+    const store = new BookingStore();
+    const existing = store.create({ room: 'A', title: '선약', start: week(2, 10), end: week(2, 12) });
+    expect(() => store.createWeekly(base, 4)).toThrow(expect.objectContaining({ status: 409 }));
+    expect(store.list()).toEqual([existing]);
+    expect(store.createWeekly({ ...base, room: 'B' }, 4)).toHaveLength(4);
+  });
+
+  it('규칙에 맞지 않으면 기존 오류 그대로 400, 아무것도 만들지 않는다', () => {
+    const store = new BookingStore();
+    expect(() => store.createWeekly({ ...base, end: week(0, 19) }, 2)).toThrow(
+      expect.objectContaining({ status: 400, code: 'OUTSIDE_BUSINESS_HOURS' }),
+    );
+    expect(() => store.createWeekly({ ...base, start: 'tomorrow' }, 2)).toThrow('형식');
+    expect(store.list()).toEqual([]);
+  });
+});
