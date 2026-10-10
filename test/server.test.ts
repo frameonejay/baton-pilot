@@ -81,3 +81,104 @@ describe('POST /bookings 업무 시간 검증', () => {
     expect(res.status).toBe(201);
   });
 });
+
+async function get(store: BookingStore, url: string) {
+  const req = Object.assign(Readable.from([]), { method: 'GET', url }) as unknown as IncomingMessage;
+  const out = { status: 0, body: '' };
+  const res = {
+    writeHead(status: number) {
+      out.status = status;
+    },
+    end(chunk?: string) {
+      out.body = chunk ?? '';
+    },
+  } as unknown as ServerResponse;
+  await handler(store)(req, res);
+  return { status: out.status, body: out.body ? JSON.parse(out.body) : null };
+}
+
+describe('GET /bookings 페이지네이션', () => {
+  const at = (hour: number) => `2026-10-08T${String(hour).padStart(2, '0')}:00:00+09:00`;
+  /** A에 9~16시 1시간짜리 예약 8개(입력은 역순), B에 1개 */
+  function seeded() {
+    const store = new BookingStore();
+    for (let hour = 16; hour >= 9; hour -= 1) {
+      store.create({ room: 'A', title: `A${hour}`, start: at(hour), end: at(hour + 1) });
+    }
+    store.create({ room: 'B', title: 'B9', start: at(9), end: at(10) });
+    return store;
+  }
+  const titles = (body: { items: { title: string }[] }) => body.items.map((b) => b.title);
+
+  it('쿼리가 없으면 { items, total, limit: 20, offset: 0 }을 시작 시각 순으로 돌려준다', async () => {
+    const res = await get(seeded(), '/bookings');
+    expect(res.status).toBe(200);
+    expect(Object.keys(res.body).sort()).toEqual(['items', 'limit', 'offset', 'total']);
+    expect(res.body).toMatchObject({ total: 9, limit: 20, offset: 0 });
+    expect(res.body.items).toHaveLength(9);
+    const starts = res.body.items.map((b: { start: string }) => Date.parse(b.start));
+    expect(starts).toEqual([...starts].sort((a, b) => a - b));
+  });
+
+  it('예약이 없으면 items는 빈 배열, total은 0', async () => {
+    const res = await get(new BookingStore(), '/bookings');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ items: [], total: 0, limit: 20, offset: 0 });
+  });
+
+  it('limit·offset으로 자르고 total은 자르기 전 개수다', async () => {
+    const res = await get(seeded(), '/bookings?room=A&limit=3&offset=2');
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ total: 8, limit: 3, offset: 2 });
+    expect(titles(res.body)).toEqual(['A11', 'A12', 'A13']);
+  });
+
+  it('offset이 total 이상이면 items는 빈 배열', async () => {
+    const res = await get(seeded(), '/bookings?room=A&offset=8');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ items: [], total: 8, limit: 20, offset: 8 });
+  });
+
+  it('limit 경계값 1과 100을 받는다', async () => {
+    const one = await get(seeded(), '/bookings?limit=1');
+    expect(one.status).toBe(200);
+    expect(one.body).toMatchObject({ total: 9, limit: 1 });
+    expect(one.body.items).toHaveLength(1);
+    const hundred = await get(seeded(), '/bookings?limit=100');
+    expect(hundred.status).toBe(200);
+    expect(hundred.body).toMatchObject({ total: 9, limit: 100 });
+  });
+
+  it.each([
+    'limit=0',
+    'limit=101',
+    'limit=-1',
+    'limit=1.5',
+    'limit=abc',
+    'limit=',
+    'limit=1e1',
+    'limit=%2B5',
+    'offset=-1',
+    'offset=0.5',
+    'offset=x',
+    'offset=',
+  ])('%s이면 400과 한국어 오류 메시지', async (query) => {
+    const res = await get(seeded(), `/bookings?${query}`);
+    expect(res.status).toBe(400);
+    const name = query.split('=')[0];
+    const range = name === 'limit' ? '1~100' : '0 이상';
+    expect(res.body.error).toBe(`${name}은 ${range}의 정수여야 합니다`);
+  });
+
+  it('room 필터는 지금처럼 그 회의실 예약만 돌려준다', async () => {
+    const b = await get(seeded(), '/bookings?room=B');
+    expect(b.body).toEqual({
+      items: [expect.objectContaining({ title: 'B9', room: 'B' })],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+    const none = await get(seeded(), '/bookings?room=Z');
+    expect(none.body).toEqual({ items: [], total: 0, limit: 20, offset: 0 });
+  });
+});
