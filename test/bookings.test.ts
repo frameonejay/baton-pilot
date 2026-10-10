@@ -119,6 +119,24 @@ describe('BookingStore', () => {
     ).toThrow(expect.objectContaining({ status: 400, code: 'OUTSIDE_BUSINESS_HOURS' }));
   });
 
+  it('오프셋이 다른 시각이 섞여도 실제 시각 순으로 돌려준다', () => {
+    const store = new BookingStore();
+    // 02:00Z = 11:00 KST, 10:00+09:00 = 01:00Z: 문자열로는 Z가 앞이지만 실제로는 뒤다
+    store.create({ room: 'A', title: '11시', start: '2026-10-08T02:00:00Z', end: '2026-10-08T03:00:00Z' });
+    store.create({ room: 'A', title: '10시', start: at(10), end: at(11) });
+    store.create({ room: 'A', title: '9시', start: '2026-10-08T01:00:00+01:00', end: '2026-10-08T02:00:00+01:00' });
+    expect(store.list('A').map((b) => b.title)).toEqual(['9시', '10시', '11시']);
+  });
+
+  it('시작 시각이 같으면 먼저 만든 예약이 앞이다', () => {
+    const store = new BookingStore();
+    // 10:00+09:00과 01:00Z는 같은 시각이다
+    store.create({ room: 'B', title: '첫째', start: at(10), end: at(11) });
+    store.create({ room: 'A', title: '둘째', start: '2026-10-08T01:00:00Z', end: '2026-10-08T02:00:00Z' });
+    store.create({ room: 'C', title: '셋째', start: at(10), end: at(11) });
+    expect(store.list().map((b) => b.title)).toEqual(['첫째', '둘째', '셋째']);
+  });
+
   it('취소한 예약은 사라지고, 없는 예약은 404', () => {
     vi.useFakeTimers({ now: new Date(at(8)) });
     const store = new BookingStore();
