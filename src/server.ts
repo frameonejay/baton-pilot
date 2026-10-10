@@ -42,7 +42,7 @@ function intParam(params: URLSearchParams, name: string, fallback: number, min: 
   const value = /^\d+$/.test(raw) ? Number(raw) : Number.NaN;
   if (!(value >= min && value <= max)) {
     const range = max === Number.MAX_SAFE_INTEGER ? `${min} 이상` : `${min}~${max}`;
-    throw new BookingError(400, `${name}는 ${range}의 정수여야 합니다`);
+    throw new BookingError(400, `${name}은 ${range}의 정수여야 합니다`);
   }
   return value;
 }

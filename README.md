@@ -11,7 +11,7 @@ npm start   # http://localhost:3000
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
-| GET | `/bookings?room=A&limit=20&offset=0` | 예약 목록 `{ items, total, limit, offset }` (시작 시각 순). limit은 1~100(기본 20), offset은 0 이상(기본 0). 벗어나면 400 |
+| GET | `/bookings?room=A&limit=20&offset=0` | 예약 목록 `{ items, total, limit, offset }` (시작 시각 순). limit은 1~100(기본 20), offset은 0 이상(기본 0). 범위를 벗어나거나 정수가 아니면 400 |
 | POST | `/bookings` | `{ room, title, start, end }`. 겹치면 409 |
 | DELETE | `/bookings/:id` | 예약 취소. 없으면 404 |
 | GET | `/rooms/:id` | 회의실 `{ id, name, capacity }`. 없으면 404 |
