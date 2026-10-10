@@ -309,3 +309,85 @@ describe('POST /bookings 주간 반복 예약', () => {
     expect(res.body).toEqual({ id: 'bk-1', ...body });
   });
 });
+
+async function patch(store: BookingStore, id: string, body: unknown) {
+  const req = Object.assign(Readable.from([Buffer.from(JSON.stringify(body))]), {
+    method: 'PATCH',
+    url: `/bookings/${id}`,
+  }) as unknown as IncomingMessage;
+  const out = { status: 0, body: '' };
+  const res = {
+    writeHead(status: number) {
+      out.status = status;
+    },
+    end(chunk?: string) {
+      out.body = chunk ?? '';
+    },
+  } as unknown as ServerResponse;
+  await handler(store)(req, res);
+  return { status: out.status, body: out.body ? JSON.parse(out.body) : null };
+}
+
+describe('PATCH /bookings/:id 예약 변경', () => {
+  const day = (time: string) => `2026-10-08T${time}:00+09:00`;
+
+  /** A 회의실 10:00~11:00(bk-1), 13:00~14:00(bk-2) */
+  function seeded() {
+    const store = new BookingStore();
+    const b = store.create({ room: 'A', title: '회의', start: day('10:00'), end: day('11:00') });
+    const other = store.create({ room: 'A', title: '다른 회의', start: day('13:00'), end: day('14:00') });
+    // 실패 뒤 상태를 비교할 스냅숏. store가 들고 있는 객체와 같은 참조면 제자리 변경을 잡지 못한다
+    const before = structuredClone([b, other]);
+    return { store, b, other, before };
+  }
+
+  it('준 필드만 바꾸고 200과 바뀐 예약 전체를 돌려준다. id는 그대로다', async () => {
+    const { store, b } = seeded();
+    const res = await patch(store, b.id, { title: '회고', end: day('12:00') });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: 'bk-1', room: 'A', title: '회고', start: day('10:00'), end: day('12:00') });
+    expect(store.get('bk-1')).toEqual(res.body);
+  });
+
+  it('다른 예약과 겹치면 409, 자기 자신과는 겹침으로 보지 않는다', async () => {
+    const { store, b, before } = seeded();
+    const conflict = await patch(store, b.id, { end: day('13:30') });
+    expect(conflict.status).toBe(409);
+    expect(store.list()).toEqual(before);
+    const self = await patch(store, b.id, { start: day('10:30'), end: day('11:30') });
+    expect(self.status).toBe(200);
+  });
+
+  it('없는 예약이면 404', async () => {
+    const { store, before } = seeded();
+    const res = await patch(store, 'bk-404', { title: 't' });
+    expect(res.status).toBe(404);
+    expect(store.list()).toEqual(before);
+  });
+
+  it.each([{ title: '' }, { start: 'tomorrow' }, { start: '2026-10-08T11:00:00+09:00' }, { title: 1 }])(
+    '%o이면 400과 한국어 오류 메시지, 예약은 그대로다',
+    async (body) => {
+      const { store, b, before } = seeded();
+      const res = await patch(store, b.id, body);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/[가-힣]/);
+      expect(store.list()).toEqual(before);
+    },
+  );
+
+  it('본문이 객체가 아니면 400', async () => {
+    const { store, b, before } = seeded();
+    const res = await patch(store, b.id, null);
+    expect(res.status).toBe(400);
+    expect(store.get(b.id)).toEqual(before[0]);
+  });
+
+  it('변경 뒤에도 새 예약 id는 bk-3이다', async () => {
+    const { store, b } = seeded();
+    await patch(store, b.id, { title: '회고' });
+    await patch(store, b.id, { end: day('13:30') });
+    const res = await post({ ...slot, title: '새 회의', start: day('15:00'), end: day('16:00') }, store);
+    expect(res.body.id).toBe('bk-3');
+  });
+});

@@ -1,8 +1,8 @@
 import { type IncomingMessage, type ServerResponse, createServer } from 'node:http';
-import { BookingError, type BookingInput, BookingStore } from './bookings.ts';
+import { BookingError, type BookingInput, type BookingPatch, BookingStore } from './bookings.ts';
 import { RoomStore } from './rooms.ts';
 
-/** GET /bookings[?room=&limit=&offset=], POST /bookings, DELETE /bookings/:id, GET /rooms/:id */
+/** GET /bookings[?room=&limit=&offset=], POST /bookings, PATCH /bookings/:id, DELETE /bookings/:id, GET /rooms/:id */
 export function handler(store: BookingStore, rooms: RoomStore = new RoomStore()) {
   return async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -20,6 +20,9 @@ export function handler(store: BookingStore, rooms: RoomStore = new RoomStore())
         return send(res, 201, store.createWeekly(input, repeatWeeks as number));
       }
       const match = url.pathname.match(/^\/bookings\/([\w-]+)$/);
+      if (req.method === 'PATCH' && match?.[1]) {
+        return send(res, 200, store.update(match[1], (await readJson(req)) as BookingPatch));
+      }
       if (req.method === 'DELETE' && match?.[1]) {
         store.cancel(match[1]);
         return send(res, 204, null);

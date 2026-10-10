@@ -2,6 +2,7 @@
 
 ## 미배포
 
+- [ELMJ-10] PATCH /bookings/:id로 예약의 제목·시간을 바꾼다 (회의실은 그대로, 실패하면 바뀌지 않는다) [ci-feedback-7q2]
 - [ELMJ-9] GET /bookings 목록을 오프셋과 상관없이 실제 시작 시각 순으로, 같으면 먼저 만든 예약 순으로 정렬한다 [ci-feedback-7q2]
 - [ELMJ-7] POST /bookings에 repeatWeeks(2~12)를 주면 같은 요일·시각으로 여러 주를 한 번에 예약한다 (하나라도 안 되면 아무것도 만들지 않는다) [ci-feedback-7q2]
 - [ELMJ-6] 시작까지 1시간이 안 남았거나 이미 시작한 예약의 취소를 409로 막는다 [ci-feedback-7q2]
