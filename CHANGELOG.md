@@ -2,7 +2,7 @@
 
 ## 미배포
 
-- [ELMJ-12] GET /rooms로 회의실 목록을 id 순으로 조회한다 (minCapacity로 수용 인원 필터)
+- [ELMJ-12] GET /rooms로 회의실 목록을 id 순으로 조회한다 (minCapacity로 수용 인원 필터) [ci-feedback-7q2]
 - [ELMJ-11] README 커밋 규칙에 버그 수정과 CI·리뷰 후속 수정용 fix(KEY)를 적는다 [ci-feedback-7q2]
 - [ELMJ-10] PATCH /bookings/:id로 예약의 제목·시간을 바꾼다 (회의실은 그대로, 실패하면 바뀌지 않는다) [ci-feedback-7q2]
 - [ELMJ-9] GET /bookings 목록을 오프셋과 상관없이 실제 시작 시각 순으로, 같으면 먼저 만든 예약 순으로 정렬한다 [ci-feedback-7q2]
