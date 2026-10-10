@@ -165,7 +165,9 @@ describe('GET /bookings 페이지네이션', () => {
   ])('%s이면 400과 한국어 오류 메시지', async (query) => {
     const res = await get(seeded(), `/bookings?${query}`);
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/limit|offset/);
+    const name = query.split('=')[0];
+    const range = name === 'limit' ? '1~100' : '0 이상';
+    expect(res.body.error).toBe(`${name}은 ${range}의 정수여야 합니다`);
   });
 
   it('room 필터는 지금처럼 그 회의실 예약만 돌려준다', async () => {
